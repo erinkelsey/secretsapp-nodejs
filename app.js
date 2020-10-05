@@ -41,8 +41,11 @@ app.use(passport.session());
  * Setup Passport.js for hashing, salting passwords
  * and implementing cookies and sessions.
  *
- * Setup Google OAuth2.0
- * for allowing users to register and login with a Google Account.
+ * Setup Google OAuth2.0 for allowing users to register
+ * and login with a Google Account.
+ *
+ * Setup Local Strategy, so that users can login with an
+ * account setup with the app.
  */
 mongoose.connect(process.env.MONGODB_SRV_ADDRESS, {
   useNewUrlParser: true,
@@ -99,9 +102,6 @@ passport.use(
           message: "User could not be authenticated.",
         });
       }
-      // if (!user.validPassword(password)) {
-      //   return done(null, false, { message: "Incorrect password." });
-      // }
       return done(null, user);
     });
   })
