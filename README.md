@@ -6,7 +6,7 @@ Use Passport.js and passport-local-mongoose to hash and salt passwords stored in
 
 Use Google OAuth2.0, so that users can register and login with Google Accounts, instead of using app authentication.
 
-Hosted example:
+Hosted example: https://secretsapp-nodejs.herokuapp.com/
 
 ### Install
 

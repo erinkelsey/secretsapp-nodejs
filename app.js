@@ -57,6 +57,7 @@ const userSchema = new mongoose.Schema({
   googleId: String,
   email: String,
   password: String,
+  secret: String,
 });
 
 userSchema.plugin(passportLocalMongoose);
@@ -199,12 +200,47 @@ app.post("/register", (req, res) => {
 /**
  * GET method for the /secrets route.
  *
- * Main page for app. User must be authenticated to view.
- * Redirects to login page if user is not authenticated.
+ * Renders secrets page. User must be authenticated to view.
+ * Secrets page shows all of the user's secrets.
+ * Redirects to login page, if user is not authenticated.
  */
 app.get("/secrets", (req, res) => {
-  if (req.isAuthenticated()) res.render("secrets");
-  else res.redirect("login");
+  if (req.isAuthenticated()) {
+    User.find({ secret: { $ne: null } }, (err, foundUsers) => {
+      if (err) res.redirect("/login");
+      else res.render("secrets", { usersWithSecrets: foundUsers });
+    });
+  } else res.redirect("/login");
+});
+
+/**
+ * GET method for the /submit route.
+ *
+ * Renders the submit page, if user is authenticated.
+ * Redirects to login page, if user is not authenticated.
+ */
+app.get("/submit", (req, res) => {
+  if (req.isAuthenticated()) res.render("submit");
+  else res.redirect("/login");
+});
+
+/**
+ * POST method for /submit route.
+ *
+ * Adds the secret the user has submitted to their secret field.
+ * Redirects to submit page, if there is an error.
+ * If successful, redirects to secrets page, where new secret
+ * will be displayed.
+ */
+app.post("/submit", (req, res) => {
+  User.findById(req.user.id, (err, user) => {
+    if (user) {
+      user.secret = req.body.secret;
+      user.save(() => {
+        res.redirect("/secrets");
+      });
+    } else res.redirect("/submit");
+  });
 });
 
 /**
