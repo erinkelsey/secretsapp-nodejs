@@ -10,6 +10,8 @@ const mongoose = require("mongoose");
 const session = require("express-session");
 const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const findOrCreate = require("mongoose-findorcreate");
 
 const app = express();
 
@@ -34,6 +36,12 @@ app.use(passport.session());
 /**
  * MongoDB and mongoose setup, including schema and models
  * for User.
+ *
+ * Setup Passport.js for hashing, salting passwords
+ * and implementing cookies and sessions.
+ *
+ * Setup Google OAuth2.0
+ * for allowing users to register and login with a Google Account.
  */
 mongoose.connect(process.env.MONGODB_SRV_ADDRESS, {
   useNewUrlParser: true,
@@ -42,17 +50,42 @@ mongoose.connect(process.env.MONGODB_SRV_ADDRESS, {
 mongoose.set("useCreateIndex", true);
 
 const userSchema = new mongoose.Schema({
+  googleId: String,
   email: String,
   password: String,
 });
 
 userSchema.plugin(passportLocalMongoose);
+userSchema.plugin(findOrCreate);
 
 const User = new mongoose.model("User", userSchema);
 
 passport.use(User.createStrategy());
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
+passport.serializeUser(function (user, done) {
+  done(null, user.id);
+});
+
+passport.deserializeUser(function (id, done) {
+  User.findById(id, function (err, user) {
+    done(err, user);
+  });
+});
+
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_OAUTH_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+      callbackURL: process.env.GOOGLE_OAUTH_CALLBACK_URL,
+      userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo",
+    },
+    function (accessToken, refreshToken, profile, cb) {
+      User.findOrCreate({ googleId: profile.id }, function (err, user) {
+        return cb(err, user);
+      });
+    }
+  )
+);
 
 /**
  * GET method for / route.
@@ -62,6 +95,32 @@ passport.deserializeUser(User.deserializeUser());
 app.get("/", (req, res) => {
   res.render("home");
 });
+
+/**
+ * GET method for /auth/google route.
+ *
+ * Uses Passport.js to authenticate through Google.
+ * Redirects to a Google page for authentication.
+ */
+app.get(
+  "/auth/google",
+  passport.authenticate("google", { scope: ["email", "profile"] })
+);
+
+/**
+ * GET method for /auth/google/secrets route, which is the
+ * callback function when user has been authenticated with Google.
+ *
+ * If authentication failed, redirect to login page, else
+ * redirect to secrets page.
+ */
+app.get(
+  "/auth/google/secrets",
+  passport.authenticate("google", { failureRedirect: "/login" }),
+  (req, res) => {
+    res.redirect("/secrets");
+  }
+);
 
 /**
  * GET method for /login route.
