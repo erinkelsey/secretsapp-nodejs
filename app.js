@@ -11,6 +11,7 @@ const session = require("express-session");
 const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const LocalStrategy = require("passport-local").Strategy;
 const findOrCreate = require("mongoose-findorcreate");
 
 const app = express();
@@ -61,12 +62,12 @@ userSchema.plugin(findOrCreate);
 const User = new mongoose.model("User", userSchema);
 
 passport.use(User.createStrategy());
-passport.serializeUser(function (user, done) {
+passport.serializeUser((user, done) => {
   done(null, user.id);
 });
 
-passport.deserializeUser(function (id, done) {
-  User.findById(id, function (err, user) {
+passport.deserializeUser((id, done) => {
+  User.findById(id, (err, user) => {
     done(err, user);
   });
 });
@@ -79,12 +80,31 @@ passport.use(
       callbackURL: process.env.GOOGLE_OAUTH_CALLBACK_URL,
       userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo",
     },
-    function (accessToken, refreshToken, profile, cb) {
-      User.findOrCreate({ googleId: profile.id }, function (err, user) {
+    (accessToken, refreshToken, profile, cb) => {
+      User.findOrCreate({ googleId: profile.id }, (err, user) => {
         return cb(err, user);
       });
     }
   )
+);
+
+passport.use(
+  new LocalStrategy((username, password, done) => {
+    User.findOne({ username: username }, (err, user) => {
+      if (err) {
+        return done(err);
+      }
+      if (!user) {
+        return done(null, false, {
+          message: "User could not be authenticated.",
+        });
+      }
+      // if (!user.validPassword(password)) {
+      //   return done(null, false, { message: "Incorrect password." });
+      // }
+      return done(null, user);
+    });
+  })
 );
 
 /**
@@ -137,17 +157,14 @@ app.get("/login", (req, res) => {
  * Checks if the submitted username/email and password matches a user in the db.
  * If no match, returns to login page, else renders the secrets page.
  */
-app.post("/login", (req, res) => {
-  const user = new User({
-    username: req.body.username,
-    password: req.body.password,
-  });
-
-  req.login(user, (err) => {
-    if (err) res.redirect("/login");
-    else res.redirect("/secrets");
-  });
-});
+app.post(
+  "/login",
+  passport.authenticate("local", {
+    successRedirect: "/secrets",
+    failureRedirect: "/login",
+    failureFlash: true,
+  })
+);
 
 /**
  * GET method for /register route.
